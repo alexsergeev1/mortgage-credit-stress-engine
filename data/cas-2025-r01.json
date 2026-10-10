@@ -1,0 +1,21 @@
+{
+  "issuer": "Fannie Mae",
+  "series": "CAS 2025-R01",
+  "cutoffDate": "2024-11-30",
+  "referencePoolBalanceUsd": 17404517513,
+  "referenceLoanCount": 51922,
+  "weightedAverageMortgageRatePct": 6.8,
+  "weightedAverageFico": 760,
+  "weightedAverageOriginalLtvPct": 75.6,
+  "offeredClasses": [
+    { "class": "1A-1", "initialPrincipalUsd": 264548000, "sofrSpreadBps": 95 },
+    { "class": "1M-1", "initialPrincipalUsd": 264548000, "sofrSpreadBps": 110 },
+    { "class": "1M-2", "initialPrincipalUsd": 140541000, "sofrSpreadBps": 150 },
+    { "class": "1B-1", "initialPrincipalUsd": 107472000, "sofrSpreadBps": 170 }
+  ],
+  "sources": [
+    { "title": "Executed indenture — opening notes table and defined cut-off balance", "url": "https://capitalmarkets.fanniemae.com/media/25721/display" },
+    { "title": "Offering memorandum — Appendix A reference pool characteristics", "url": "https://capitalmarkets.fanniemae.com/media/25676/display" }
+  ],
+  "scope": "Verified transaction reference only. The offered classes are not the full reference tranche structure, and the simulated deals and loss rules do not replicate this security's payment waterfall or realized performance."
+}

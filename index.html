@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A mortgage credit stress simulator with constrained portfolio optimization and an auditable scenario explorer.">
+  <title>Mortgage Credit Stress Engine</title>
+  <link rel="stylesheet" href="./styles.css?v=1">
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <a href="./" class="brand">Mortgage Credit Stress Engine</a>
+      <nav aria-label="Sections"><a href="#decision">Decision</a><a href="#scenario">Scenarios</a><a href="#evidence">Evidence</a></nav>
+      <a class="quiet" href="https://github.com/alexsergeev1/mortgage-credit-stress-engine">Source code ↗</a>
+    </header>
+    <section class="intro">
+      <p class="overline">Structured credit · Portfolio risk</p>
+      <h1>Where does the loss land?</h1>
+      <p>Stress a portfolio of mortgage credit tranches, trace losses through the capital structure, and choose an allocation under carry and concentration limits.</p>
+    </section>
+    <div class="workspace" id="decision">
+      <form class="panel controls" id="study">
+        <h2>Study assumptions</h2>
+        <label for="stress">Housing stress <output id="stress-value">1.0×</output></label>
+        <input id="stress" name="stress" type="range" min="0.6" max="2" step="0.1" value="1">
+        <label for="size">Portfolio ($ millions)</label>
+        <input id="size" type="number" min="10" max="750" step="10" value="100" required>
+        <label for="carry">Annual spread carry floor (%)</label>
+        <input id="carry" type="number" min="0" max="15" step="0.1" value="4.2" required>
+        <label for="cap">Single-tranche cap (%)</label>
+        <input id="cap" type="number" min="15" max="100" step="1" value="35" required>
+        <label for="paths">Scenario budget</label>
+        <select id="paths"><option value="1200">1,200 scenarios</option><option value="3000">3,000 scenarios</option><option value="6000" selected>6,000 scenarios</option></select>
+        <button class="primary" id="run" type="submit">Run stress study</button>
+        <p class="subtle" id="status" role="status" aria-live="polite">Loading the public inputs…</p>
+      </form>
+      <section class="results" aria-labelledby="allocation-title">
+        <div class="kpis" id="kpis" aria-label="Study results"></div>
+        <article class="panel allocation">
+          <div class="section-title"><div><h2 id="allocation-title">Allocation recommendation</h2><p id="decision-note">Run the study to compare tranche weights.</p></div><button id="export" type="button" disabled>Download audit JSON</button></div>
+          <div class="table-scroll"><table><thead><tr><th>Tranche</th><th>Loss layer</th><th>Spread</th><th>Issue size</th><th>Baseline</th><th>Optimized</th><th>Trade</th></tr></thead><tbody id="allocations"></tbody></table></div>
+        </article>
+      </section>
+    </div>
+    <section id="scenario" class="lower">
+      <article class="panel plot">
+        <div class="section-title"><div><h2>Loss across scenarios</h2><p>Sorted by baseline loss. Both series use the same holdout paths.</p></div></div>
+        <canvas id="risk-chart" width="840" height="248" role="img" aria-label="Holdout losses by baseline rank for the baseline and optimized portfolios"></canvas>
+        <div class="legend"><span class="baseline">Baseline</span><span class="optimized">Optimized</span></div>
+        <label class="scrub-label" for="path">Inspect a scenario <output id="path-label">—</output></label>
+        <input id="path" type="range" min="0" max="1" value="0" disabled>
+        <div class="path-readout" id="path-detail"></div>
+      </article>
+      <article class="panel plot">
+        <div class="section-title"><div><h2>Mortgage performance</h2><p>Cumulative modeled outcomes by quarter.</p></div></div>
+        <canvas id="timeline" width="680" height="248" role="img" aria-label="Cumulative mean mortgage defaults, prepayments and pool credit losses"></canvas>
+        <div class="legend"><span class="baseline">Defaults</span><span class="optimized">Prepayments</span><span class="third">Pool loss</span></div>
+        <div class="section-title waterfall-title"><div><h2>Tranche waterfall</h2><p>Loss absorbed by each layer in a representative path.</p></div></div>
+        <div class="table-scroll"><table><thead><tr><th>Layer</th><th>Starting balance</th><th>Loss absorbed</th><th>Remaining</th></tr></thead><tbody id="waterfall"></tbody></table></div>
+      </article>
+    </section>
+    <section id="evidence" class="panel evidence">
+      <div class="section-title"><div><h2>Data and validation</h2><p>Public observations and modeled assumptions are labeled at the point of use.</p></div></div>
+      <div id="sources" class="evidence-grid"></div>
+      <div class="evidence-grid">
+        <article class="evidence-card">
+          <h3>Metro housing stress explorer</h3>
+          <label for="metro" class="subtle">FHFA all-transactions index</label>
+          <select id="metro" disabled></select>
+          <p id="metro-readout">Loading historical metro observations…</p>
+        </article>
+        <article class="evidence-card">
+          <h3>Fannie Mae CAS 2025-R01</h3>
+          <p id="deal-summary">Loading public deal terms…</p>
+          <div class="table-scroll"><table><thead><tr><th>Class</th><th>Balance</th><th>Spread</th></tr></thead><tbody id="deal-classes"></tbody></table></div>
+        </article>
+        <article class="evidence-card">
+          <h3>Model audit</h3>
+          <p id="audit">Run a study to see candidate and reconciliation diagnostics.</p>
+        </article>
+      </div>
+    </section>
+    <footer>Research prototype · Representative securities and scenario inputs · USD</footer>
+  </main>
+  <script type="module" src="./app.mjs?v=1"></script>
+</body>
+</html>
