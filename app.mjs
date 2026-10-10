@@ -40,7 +40,7 @@ function seriesChart(canvas, series, xLabel, cursor) {
   ctx.scale(dpr, dpr);
   const left = 51, right = width - 13, top = 12, bottom = height - 24;
   const seriesLength = Math.max(...series.map((line) => line.values.length));
-  const maximum = Math.max(0.01, ...series.flatMap((line) => line.values)) * 1.09;
+  const maximum = Math.min(1, Math.max(0.01, ...series.flatMap((line) => line.values)) * 1.09);
   const x = (index) => left + index / Math.max(1, seriesLength - 1) * (right - left);
   const y = (value) => bottom - value / maximum * (bottom - top);
   ctx.font = "10px Consolas, monospace";
@@ -89,7 +89,7 @@ function showPath() {
     ["Baseline loss", pct(p.baselineLoss)],
     ["Optimized loss", pct(p.optimizedLoss)],
     ["House-price change", pct(p.housePriceChange)],
-    ["Peak unemployment", pct(p.unemploymentPeak)],
+    ["Peak unemployment", pct(p.unemploymentPeak / 100)],
   ].map(([label, value]) => {
     const div = document.createElement("div");
     const strong = document.createElement("strong");
@@ -133,7 +133,7 @@ function showStudy(result) {
       Math.abs(trade) < 1 ? "Hold" : `${trade > 0 ? "Add" : "Cut"} ${money(Math.abs(trade))}`]);
   }));
   $("waterfall").replaceChildren(...study.waterfall.map((layer) =>
-    row([layer.id, money(layer.initialPrincipal), money(layer.loss), money(layer.balance)])));
+    row([layer.id, money(layer.initialPrincipal), money(layer.loss), money(layer.returnedPrincipal), money(layer.balance)])));
   rankedPaths = [...study.paths].sort((a, b) => a.baselineLoss - b.baselineLoss);
   $("path").max = rankedPaths.length - 1;
   $("path").value = Math.floor((rankedPaths.length - 1) * 0.97);
@@ -142,6 +142,7 @@ function showStudy(result) {
   showPath();
   showTimeline();
   const d = study.diagnostics;
+  $("waterfall-note").textContent = `Path ${d.waterfallScenarioId}, near the 95th percentile of aggregate pool credit loss.`;
   $("status").textContent = `${count.format(rankedPaths.length)} holdout paths. Calibrated with ${count.format(macro.rows.length)} national months and ${count.format(d.regionalObservations)} overlapping metro-quarter changes.`;
   const coverage = d.historicalCoverage;
   const calibration = coverage ? ` Historical interval coverage on ${coverage.holdoutCount} later quarterly changes ranged from ${pct(Math.min(...coverage.variables.map((x) => x.observedCoverage)), 0)} to ${pct(Math.max(...coverage.variables.map((x) => x.observedCoverage)), 0)} for a nominal ${pct(coverage.centralInterval, 0)} interval.` : "";

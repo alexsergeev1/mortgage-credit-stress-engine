@@ -56,8 +56,8 @@
         <div class="section-title"><div><h2>Mortgage performance</h2><p>Cumulative modeled outcomes by quarter.</p></div></div>
         <canvas id="timeline" width="680" height="248" role="img" aria-label="Cumulative mean mortgage defaults, prepayments and pool credit losses"></canvas>
         <div class="legend"><span class="baseline">Defaults</span><span class="optimized">Prepayments</span><span class="third">Pool loss</span></div>
-        <div class="section-title waterfall-title"><div><h2>Tranche waterfall</h2><p>Loss absorbed by each layer in a representative path.</p></div></div>
-        <div class="table-scroll"><table><thead><tr><th>Layer</th><th>Starting balance</th><th>Loss absorbed</th><th>Remaining</th></tr></thead><tbody id="waterfall"></tbody></table></div>
+        <div class="section-title waterfall-title"><div><h2>Tranche waterfall</h2><p id="waterfall-note">Loss absorbed by each layer in a representative path.</p></div></div>
+        <div class="table-scroll"><table><thead><tr><th>Layer</th><th>Starting balance</th><th>Loss absorbed</th><th>Principal repaid</th><th>Remaining</th></tr></thead><tbody id="waterfall"></tbody></table></div>
       </article>
     </section>
     <section id="evidence" class="panel evidence">
@@ -83,6 +83,6 @@
     </section>
     <footer>Research prototype · Representative securities and scenario inputs · USD</footer>
   </main>
-  <script type="module" src="./app.mjs?v=1"></script>
+  <script type="module" src="./app.mjs?v=2"></script>
 </body>
 </html>
