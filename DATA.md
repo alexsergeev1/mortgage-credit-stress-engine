@@ -1,5 +1,9 @@
 # Data provenance
 
+Company research shares SEC snapshots with the Tariff Sourcing Optimizer. `data/companies-index.json` records directory and retained financial coverage. Each company file preserves CIK, industry, metric taxonomy and concept, period, filing date, accession and source URL. Financial values can have different reporting periods, shown beside each value. Missing facts stay missing. The shared daily company refresh publishes status and data to that repository's `company-data` branch, retaining previous facts when the source cannot be fetched.
+
+Reported assets and mortgage-related accounting concepts are company research context. The user chooses the mortgage-credit exposure, carry target, concentration limit and tail-loss decision limit for the modeled study. Those choices do not establish the company's actual holdings or policies. A company without retained financials can use a manually scoped scenario with its SEC filing links.
+
 Run `node ingest.mjs` from this directory to refresh the browser data from January 1991 through the newest published periods. No API key is required. National data joins only closed calendar months with observations in all three series. The pipeline averages available weekly mortgage rates within each month and leaves missing months out. FHFA metro data includes published positive index values through the latest available closed quarter. A fresh download can reflect source revisions, so the committed files are the reproducible snapshot for the demo.
 
 | Artifact | Observations |

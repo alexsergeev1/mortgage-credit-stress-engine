@@ -4,6 +4,8 @@
 
 A structured credit research simulator that allocates a fixed portfolio across representative mortgage credit tranches under a carry floor and concentration limit. It traces mortgage defaults, prepayments and recoveries through a quarterly principal waterfall, then compares the proposed allocation with a baseline on held-out simulated paths.
 
+Search a public company by name or ticker to inspect SEC financial facts and filings. Choose a planning role, enter a hypothetical mortgage-credit exposure and a tail-loss decision limit, then apply the case. The model evaluates that exposure under its carry and concentration constraints and reports whether its resulting tail loss is within the decision limit. The audit export preserves the company evidence and the user's mandate. Reported total assets provide scale context. The exposure entered into the study is a user assumption.
+
 ## Run a study
 
 ```sh

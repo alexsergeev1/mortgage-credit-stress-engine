@@ -7,7 +7,7 @@ createServer(async (request, response) => {
   const pathname = new URL(request.url, "http://127.0.0.1").pathname;
   const file = pathname === "/" ? "/index.html" : pathname;
   const type = media[extname(file)];
-  if (!type || !/^\/(?:data\/)?[\w.-]+$/.test(file)) return response.writeHead(404).end();
+  if (!type || !/^\/(?:data\/(?:companies\/)?)?[\w.-]+$/.test(file)) return response.writeHead(404).end();
   try {
     const content = await readFile(new URL("." + file, import.meta.url));
     response.writeHead(200, { "Content-Type": type + "; charset=utf-8" }).end(content);

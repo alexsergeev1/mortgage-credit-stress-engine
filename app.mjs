@@ -1,3 +1,5 @@
+import { setupCompanyResearch } from "./company.mjs?v=1";
+
 const $ = (id) => document.getElementById(id);
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
 const count = new Intl.NumberFormat("en-US");
@@ -6,6 +8,7 @@ const money = (value) => Number.isFinite(value) ? usd.format(value) : "—";
 const colors = { base: "#f5bd8c", selected: "#a9e8ce", third: "#a5baf8", grid: "#30434e", text: "#a8bac2" };
 let study, rankedPaths = [], macro, worker, metros, riskAudit;
 let workerBusy = false;
+let activeCompanyCase, pendingCompanyCase, studyCompanyCase, companyDecision;
 
 function cell(text, className) {
   const td = document.createElement("td");
@@ -173,6 +176,8 @@ function showRiskAudit(audit) {
 
 function showStudy(result) {
   study = result;
+  studyCompanyCase = pendingCompanyCase;
+  companyDecision = companyResearch.showStudy(study, studyCompanyCase);
   const { baseline, optimized, config, assets } = study;
   const delta = baseline.cvarDollars - optimized.cvarDollars;
   $("kpis").replaceChildren(
@@ -262,6 +267,8 @@ function loadEvidence() {
 function run() {
   if (!macro || workerBusy || !$("study").reportValidity()) return;
   workerBusy = true;
+  companyResearch.setBusy(true);
+  pendingCompanyCase = activeCompanyCase ? structuredClone(activeCompanyCase) : undefined;
   $("run").disabled = true;
   $("run-audit").disabled = true;
   $("export").disabled = true;
@@ -280,6 +287,7 @@ function run() {
 function runAudit() {
   if (!study || workerBusy) return;
   workerBusy = true;
+  companyResearch.setBusy(true);
   $("run").disabled = true;
   $("run-audit").disabled = true;
   $("audit-status").textContent = "Replaying macro history and resampling the allocation…";
@@ -291,6 +299,15 @@ function runAudit() {
   });
 }
 
+const companyResearch = setupCompanyResearch({ onApply(companyCase) {
+  if (!macro || !worker || workerBusy) throw new Error("Wait for the current study to finish before applying a case.");
+  $("size").value = companyCase.mandate.portfolioSizeDollars / 1e6;
+  if (!$("study").reportValidity()) throw new Error("Check the study assumptions before applying this case.");
+  activeCompanyCase = companyCase;
+  run();
+} });
+companyResearch.setBusy(true);
+
 $("study").addEventListener("submit", (event) => { event.preventDefault(); run(); });
 $("run-audit").addEventListener("click", runAudit);
 $("replay").addEventListener("change", showReplay);
@@ -299,7 +316,7 @@ $("path").addEventListener("input", showPath);
 $("metro").addEventListener("change", showMetro);
 window.addEventListener("resize", () => { showPath(); showTimeline(); showReplay(); });
 $("export").addEventListener("click", () => {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ provenance: macro.sources, study, riskAudit }, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ provenance: macro.sources, companyCase: studyCompanyCase, companyDecision, study, riskAudit }, null, 2)], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = "mortgage-credit-study.json";
@@ -311,6 +328,7 @@ try {
   worker = new Worker(new URL("./worker.mjs?v=3", import.meta.url), { type: "module" });
   worker.addEventListener("message", ({ data }) => {
     workerBusy = false;
+    companyResearch.setBusy(false);
     $("run").disabled = false;
     $("run-audit").disabled = !study;
     $("export").disabled = !study;
@@ -327,6 +345,7 @@ try {
   });
   worker.addEventListener("error", () => {
     workerBusy = false;
+    companyResearch.setBusy(true);
     $("run").disabled = true;
     $("run-audit").disabled = true;
     $("status").textContent = "The simulation worker could not start. Reload the page to retry.";
@@ -336,5 +355,6 @@ try {
   loadEvidence();
   run();
 } catch (error) {
+  companyResearch.setBusy(true);
   $("status").textContent = error.message;
 }

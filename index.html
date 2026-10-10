@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="A mortgage credit stress simulator with constrained portfolio optimization and an auditable scenario explorer.">
   <title>Mortgage Credit Stress Engine</title>
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=4">
 </head>
 <body>
   <main>
     <header class="masthead">
       <a href="./" class="brand">Mortgage Credit Stress Engine</a>
-      <nav aria-label="Sections"><a href="#decision">Decision</a><a href="#scenario">Scenarios</a><a href="#risk-audit">Risk audit</a><a href="#evidence">Evidence</a></nav>
+      <nav aria-label="Sections"><a href="#company-research">Company case</a><a href="#decision">Decision</a><a href="#scenario">Scenarios</a><a href="#risk-audit">Risk audit</a><a href="#evidence">Evidence</a></nav>
       <a class="quiet" href="https://github.com/alexsergeev1/mortgage-credit-stress-engine">Source code ↗</a>
     </header>
     <section class="intro">
@@ -19,13 +19,44 @@
       <h1>Where does the loss land?</h1>
       <p>Stress a portfolio of mortgage credit tranches, trace losses through the capital structure, and choose an allocation under carry and concentration limits.</p>
     </section>
+    <section class="panel company-research" id="company-research" aria-labelledby="company-title">
+      <div class="section-title"><div><h2 id="company-title">Research a company. Define a credit mandate.</h2><p>Look up public SEC financials, then evaluate a mortgage-credit allocation you specify.</p></div><span class="company-badge">Public facts · Your exposure</span></div>
+      <div class="company-workspace">
+        <div class="company-research-data">
+          <label for="company-search">Company name or ticker</label>
+          <input type="search" id="company-search" autocomplete="off" placeholder="JPM, AGNC, Bank of America…" aria-controls="company-results" disabled>
+          <p class="subtle company-directory-status" id="company-directory-status" role="status">Loading the SEC company directory…</p>
+          <p class="subtle" id="company-coverage"></p>
+          <button id="company-independent" type="button">Use independent portfolio case</button>
+          <ul id="company-results" class="company-results" aria-label="Company search results"></ul>
+          <div id="company-profile" class="company-profile"><h3>Choose a company, or use an independent portfolio case.</h3><p>Reported company financials provide context for the representative mortgage tranches and positions modeled here.</p></div>
+          <div id="company-facts" class="company-facts"></div>
+          <div id="company-filings" class="company-filings"></div>
+        </div>
+        <form id="company-case" class="company-mandate">
+          <h3>Your decision mandate</h3>
+          <label for="company-role">1. What decision are you evaluating?</label>
+          <select id="company-role"><option value="bank">Bank balance-sheet credit allocation</option><option value="investor">Mortgage investor / REIT allocation</option><option value="treasury">Corporate treasury investment</option><option value="independent" selected>Independent mortgage-credit portfolio</option></select>
+          <p id="company-role-note" class="subtle">Compare representative mortgage tranches within an investment mandate you define.</p>
+          <label for="company-notional">2. Mortgage-credit exposure in scope ($ millions)</label>
+          <input id="company-notional" type="number" min="10" max="750" step="1" value="100" required>
+          <p id="company-scale" class="subtle">Enter the allocation to evaluate. The supported model range is $10M–$750M.</p>
+          <label for="company-budget">3. Tail-loss decision limit ($ millions)</label>
+          <input id="company-budget" type="number" min="0.01" max="750" step="any" value="50" required>
+          <p class="subtle">Maximum acceptable modeled mean credit loss in the worst 5% of paths. The model checks this limit after choosing the allocation.</p>
+          <button id="company-apply" class="primary" type="submit">Apply portfolio case &amp; run</button>
+          <p class="subtle" id="company-case-status" role="status">The study’s carry floor and concentration cap also apply.</p>
+        </form>
+      </div>
+      <div id="company-decision" class="company-decision" aria-live="polite"><p>Apply a portfolio case to compare the proposed allocation with your tail-loss decision limit.</p></div>
+    </section>
     <div class="workspace" id="decision">
       <form class="panel controls" id="study">
         <h2>Study assumptions</h2>
         <label for="stress">Housing stress <output id="stress-value">1.0×</output></label>
         <input id="stress" name="stress" type="range" min="0.6" max="2" step="0.1" value="1">
         <label for="size">Portfolio ($ millions)</label>
-        <input id="size" type="number" min="10" max="750" step="10" value="100" required>
+        <input id="size" type="number" min="10" max="750" step="1" value="100" required>
         <label for="carry">Annual spread carry floor (%)</label>
         <input id="carry" type="number" min="0" max="15" step="0.1" value="4.2" required>
         <label for="cap">Single-tranche cap (%)</label>
@@ -106,7 +137,7 @@
     </section>
     <footer>Research prototype · Representative securities and scenario inputs · USD</footer>
   </main>
-  <script type="module" src="./app.mjs?v=4"></script>
+  <script type="module" src="./app.mjs?v=5"></script>
   <script type="module" src="./source-status.mjs?v=2"></script>
 </body>
 </html>
