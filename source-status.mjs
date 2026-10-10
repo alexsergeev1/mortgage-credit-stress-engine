@@ -4,7 +4,7 @@ const result = document.getElementById("source-results");
 const note = document.getElementById("source-checked");
 
 const rawUrl = "https://raw.githubusercontent.com/" + card.dataset.repo + "/source-status/source-status.json";
-const labels = { newer: "Newer data available", current: "Matches snapshot", unavailable: "Source unavailable" };
+const labels = { newer: "Newer source data available", current: "Matches snapshot", unavailable: "Source unavailable", behind: "Source behind snapshot" };
 
 async function readStatus(url) {
   const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(6000) });
@@ -25,7 +25,9 @@ function sourceRow(source) {
   if (url.protocol === "https:") name.href = url.href;
   name.textContent = source.name;
   state.textContent = labels[source.status] ?? "Unknown status";
-  detail.textContent = "Snapshot " + (source.snapshot ?? "—") + " · Latest " + (source.latest ?? "—");
+  const partial = source.latestCompleteMonth && source.latest?.slice(0, 7) > source.latestCompleteMonth;
+  detail.textContent = "Snapshot " + (source.snapshot ?? "—") + " · Latest " + (source.latest ?? "—") +
+    (partial ? " (partial month)" : "");
   item.append(name, state, detail);
   return item;
 }
@@ -34,16 +36,22 @@ async function showStatus() {
   refresh.disabled = true;
   note.textContent = "Reading the latest status report…";
   try {
-    let cached = false;
-    const payload = await readStatus(rawUrl).catch(() => {
-      cached = true;
-      return readStatus("./data/source-status.json");
-    });
+    const [bundled, online] = await Promise.allSettled([readStatus("./data/source-status.json?v=2"), readStatus(rawUrl)]);
+    const local = bundled.value, remote = online.value;
+    const matches = remote && (!local ||
+      (remote.snapshotMonth === local.snapshotMonth && remote.snapshotQuarter === local.snapshotQuarter));
+    const useRemote = matches && (!local || Date.parse(remote.checkedAt) >= Date.parse(local.checkedAt));
+    const payload = useRemote ? remote : local;
+    if (!payload) throw new Error("No status report available.");
     result.replaceChildren(...payload.sources.map(sourceRow));
     const checked = new Date(payload.checkedAt).toLocaleString("en-US", { timeZone: "UTC" });
     const stale = Date.now() - Date.parse(payload.checkedAt) > 48 * 60 * 60 * 1000;
-    note.textContent = (cached ? "Bundled check from " : "Online check from ") + checked + " UTC. " +
-      (stale ? "This report is more than 48 hours old. " : "") + "The decision model uses the pinned snapshot.";
+    const model = payload.snapshotMonth ? `Model snapshot ${payload.snapshotMonth} national · ${payload.snapshotQuarter} metro. ` : "";
+    const alignment = payload.alignedMacroLatest
+      ? `Latest month with all three national inputs is ${payload.alignedMacroLatest}. Newer individual series observations do not advance the model on their own.`
+      : "The latest aligned national month could not be verified.";
+    note.textContent = (useRemote ? "Online check from " : "Bundled check from ") + checked + " UTC. " +
+      (stale ? "This report is more than 48 hours old. " : "") + model + alignment;
   } catch {
     note.textContent = "No status report is available yet. The pinned data remains available.";
   } finally {

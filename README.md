@@ -16,11 +16,11 @@ The local dashboard opens at [127.0.0.1:4176](http://127.0.0.1:4176). Use the sc
 
 **Run risk audit** replays four observed national macro periods through the representative tranche rules. It also tests the current weights on 4,000 fresh simulated paths across five predetermined seeds. Historical replays illustrate sensitivity to observed conditions. The loan behavior and tranche losses remain modeled, and the audit reports carry-matched differences even when they are negative.
 
-**Public data updates** shows the latest source check and flags newer releases. GitHub Actions checks FRED and FHFA daily. Studies use the documented macro and metro snapshots for reproducibility.
+**Public data updates** shows the latest source check, the newest aligned national month, and the periods the model uses. GitHub Actions checks FRED and FHFA daily. Run `node ingest.mjs` to refresh the documented macro and metro snapshots.
 
 ## What the data establishes
 
-- **Historical observations.** 419 monthly observations align mortgage rates, unemployment and house prices. Quarterly joint changes inform the simulated macro shocks. The metro explorer includes 57,077 FHFA observations across 410 metros and metro divisions. Overlapping national and metro changes estimate the range of regional sensitivities used in the simulation.
+- **Historical observations.** 427 monthly observations through August 2026 align mortgage rates, unemployment and house prices. Quarterly joint changes inform the simulated macro shocks. The metro explorer includes 57,897 FHFA observations across 410 metros and metro divisions through 2026 Q2. Overlapping national and metro changes estimate the range of regional sensitivities used in the simulation.
 - **Public deal terms.** The Fannie Mae CAS 2025-R01 reference uses actual offering documents and disclosed pool statistics. It provides a concrete example of deal scale and offered classes.
 - **Modeled economics.** Securities, loan transition parameters, shock regimes and portfolio returns are representative. Holdout results measure policy behavior on independently generated scenarios. Historical deal remittances, executable prices and realized hedge P&L would require additional data.
 

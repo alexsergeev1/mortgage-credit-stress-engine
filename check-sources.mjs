@@ -1,9 +1,13 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { alignedMonths, closedMonthEnd, closedQuarter, metroRows, monthlyValues, parseFredCsv } from "./source-data.mjs";
 
 const readSnapshot = async (filename) => JSON.parse(await readFile(new URL("./data/" + filename, import.meta.url), "utf8"));
 const [macro, metro] = await Promise.all([readSnapshot("macro.json"), readSnapshot("metro-hpi.json")]);
 const macroPeriod = macro.rows.at(-1).month;
-const metroPeriod = [...new Set(metro.metros.flatMap(({ index }) => Object.keys(index)))].sort().at(-1);
+const metroPeriod = metro.latestQuarter ?? metro.metros.flatMap(({ index }) => Object.keys(index)).sort().at(-1);
+const checkedAt = new Date();
+const monthEnd = closedMonthEnd(checkedAt);
+const quarterEnd = closedQuarter(checkedAt);
 
 async function requestText(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(25_000) });
@@ -11,35 +15,35 @@ async function requestText(url) {
   return response.text();
 }
 
-async function latestFredDate(series) {
+async function fredDates(series) {
   const url = new URL("https://fred.stlouisfed.org/graph/fredgraph.csv");
   url.search = new URLSearchParams({ id: series, cosd: macroPeriod + "-01" });
-  const csv = await requestText(url);
-  if (!csv.split(/\r?\n/, 1)[0].endsWith("," + series)) throw new Error("Unexpected CSV header");
-  const dates = [...csv.matchAll(/^(\d{4}-\d{2}-\d{2}),-?\d+(?:\.\d+)?\r?$/gm)].map((match) => match[1]);
-  if (dates.length === 0) throw new Error("No observations");
-  return dates.sort().at(-1);
+  const rows = parseFredCsv(await requestText(url), series);
+  return {
+    latest: rows.map(({ date }) => date).sort().at(-1),
+    monthly: monthlyValues(rows, { end: monthEnd }),
+  };
 }
 
 async function latestMetroQuarter() {
   const csv = await requestText(metro.source);
   let latest = "";
-  for (const [, year, quarter] of csv.matchAll(/^"[^\r\n]+",\d{5},(\d{4}),([1-4]),[\d.]+,/gm)) {
-    const period = year + "Q" + quarter;
-    if (period > latest) latest = period;
+  for (const { period } of metroRows(csv)) {
+    if (period <= quarterEnd && period > latest) latest = period;
   }
   if (!latest) throw new Error("No indexed metro quarters");
   return latest;
 }
 
-async function sourceStatus(name, url, snapshot, readLatest, comparePeriod) {
-  try {
-    const latest = await readLatest();
-    return { name, url, snapshot, latest, status: comparePeriod(latest) > snapshot ? "newer" : "current" };
-  } catch (error) {
-    console.warn(`${name}: ${error.message}`);
+function sourceStatus(name, url, snapshot, result, comparePeriod) {
+  if (result.status === "rejected") {
+    console.warn(`${name}: ${result.reason.message}`);
     return { name, url, snapshot, latest: null, status: "unavailable" };
   }
+  const { latest, monthly } = result.value;
+  const period = comparePeriod(latest);
+  const status = period > snapshot ? "newer" : period === snapshot ? "current" : "behind";
+  return { name, url, snapshot, latest, status, latestCompleteMonth: monthly && [...monthly.keys()].sort().at(-1) };
 }
 
 const fredNames = {
@@ -47,11 +51,22 @@ const fredNames = {
   UNRATE: "BLS unemployment rate",
   HPIPONM226S: "FHFA national purchase-only HPI",
 };
-const sources = await Promise.all([
-  ...macro.sources.map(({ series, label, url }) =>
-    sourceStatus(fredNames[series] ?? label, url, macroPeriod, () => latestFredDate(series), (date) => date.slice(0, 7))),
-  sourceStatus("FHFA metropolitan HPI", "https://www.fhfa.gov/data/hpi/datasets", metroPeriod, latestMetroQuarter, (quarter) => quarter),
+const results = await Promise.allSettled([
+  ...macro.sources.map(({ series }) => fredDates(series)),
+  latestMetroQuarter().then((latest) => ({ latest })),
 ]);
-const output = JSON.stringify({ checkedAt: new Date().toISOString(), sources }, null, 2) + "\n";
+const nationalResults = results.slice(0, macro.sources.length);
+const sources = macro.sources.map(({ series, label, url }, i) =>
+  sourceStatus(fredNames[series] ?? label, url, macroPeriod, nationalResults[i], (date) => date.slice(0, 7)));
+sources.push(sourceStatus("FHFA metropolitan HPI", "https://www.fhfa.gov/data/hpi/datasets", metroPeriod,
+  results.at(-1), (quarter) => quarter));
+const aligned = alignedMonths(nationalResults.map((result) => result.value?.monthly));
+const output = JSON.stringify({
+  checkedAt: checkedAt.toISOString(),
+  snapshotMonth: macroPeriod,
+  snapshotQuarter: metroPeriod,
+  alignedMacroLatest: aligned?.at(-1) ?? null,
+  sources,
+}, null, 2) + "\n";
 if (process.argv[2]) await writeFile(process.argv[2], output);
 process.stdout.write(output);

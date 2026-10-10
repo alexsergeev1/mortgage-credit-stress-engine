@@ -1,7 +1,10 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { alignedMonths, closedMonthEnd, closedQuarter, metroRows, monthlyValues, parseFredCsv } from "./source-data.mjs";
 
 const start = "1991-01-01";
-const end = "2025-12-31";
+const asOf = new Date();
+const monthEnd = closedMonthEnd(asOf);
+const quarterEnd = closedQuarter(asOf);
 const dataDirectory = new URL("./data/", import.meta.url);
 const metroUrl = "https://www.fhfa.gov/hpi/download/quarterly_datasets/hpi_at_metro.csv";
 const series = [
@@ -24,42 +27,27 @@ const rounded = (value) => Number(value.toFixed(4));
 
 async function fetchSeries(source) {
   const url = new URL("https://fred.stlouisfed.org/graph/fredgraph.csv");
-  url.search = new URLSearchParams({ id: source.series, cosd: start, coed: end });
-  const [header, ...lines] = (await getText(url)).trim().split(/\r?\n/);
-  if (!header.endsWith("," + source.series)) throw new Error("Unexpected FRED header: " + header);
-  const monthly = new Map();
-  for (const line of lines) {
-    const [date, rawValue] = line.split(",");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < start || date > end || rawValue === "") continue;
-    const value = Number(rawValue);
-    if (!Number.isFinite(value)) continue;
-    const month = date.slice(0, 7);
-    if (!monthly.has(month)) monthly.set(month, []);
-    monthly.get(month).push(value);
-  }
+  url.search = new URLSearchParams({ id: source.series, cosd: start, coed: monthEnd });
+  const monthly = monthlyValues(parseFredCsv(await getText(url), source.series), { start, end: monthEnd });
   return {
     monthly,
     observations: [...monthly.values()].reduce((sum, values) => sum + values.length, 0),
+    latestCompleteMonth: [...monthly.keys()].sort().at(-1),
     downloadUrl: url.href,
   };
 }
 
 function toMetroData(csv) {
   const places = new Map();
-  let observations = 0;
-  for (const line of csv.split(/\r?\n/)) {
-    // Published layout: quoted place, CBSA code, year, quarter, index, standard error.
-    const match = /^"((?:[^"]|"")*)",(\d{5}),(\d{4}),([1-4]),([\d.]+),/.exec(line);
-    if (!match) continue;
-    const [, rawName, code, year, quarter, rawIndex] = match;
-    const value = Number(rawIndex);
-    if (year < "1991" || year > "2025" || !Number.isFinite(value) || value <= 0) continue;
-    const period = year + "Q" + quarter;
-    if (!places.has(code)) places.set(code, { code, name: rawName.replaceAll('""', '"'), index: {} });
+  let observations = 0, latestQuarter = "";
+  for (const { code, name, period, value } of metroRows(csv)) {
+    if (period < "1991Q1" || period > quarterEnd) continue;
+    if (!places.has(code)) places.set(code, { code, name, index: {} });
     const place = places.get(code);
     if (period in place.index) throw new Error(`Duplicate FHFA period for ${code}: ${period}`);
     place.index[period] = value;
     observations++;
+    if (period > latestQuarter) latestQuarter = period;
   }
   if (places.size < 300 || observations < 40_000) throw new Error("FHFA metro coverage is incomplete");
   const metros = [...places.values()].map(({ code, name, index }) => {
@@ -71,33 +59,49 @@ function toMetroData(csv) {
     const worst = yoy.reduce((low, item) => item[1] < low[1] ? item : low, ["", Infinity]);
     return { code, name, index, latestYoYPct: yoy.at(-1)?.[1] ?? null, worstYoYPct: Number.isFinite(worst[1]) ? worst[1] : null, worstPeriod: worst[0] || null };
   }).sort((a, b) => a.name.localeCompare(b.name, "en"));
-  return { source: metroUrl, observations, metros };
+  return { source: metroUrl, observations, latestQuarter, metros };
 }
 
 const [downloads, metroCsv] = await Promise.all([Promise.all(series.map(fetchSeries)), getText(metroUrl)]);
-const referenceMonths = [...downloads[2].monthly.keys()].sort();
-const rows = referenceMonths.flatMap((month) => {
+const rows = alignedMonths(downloads.map(({ monthly }) => monthly)).map((month) => {
   const values = downloads.map(({ monthly }) => monthly.get(month));
-  if (values.some((samples) => !samples?.length)) return [];
   const fields = Object.fromEntries(series.map((source, i) => [source.field, rounded(mean(values[i]))]));
   const comparisonMonth = (Number(month.slice(0, 4)) - 1) + month.slice(4);
   const comparison = downloads[2].monthly.get(comparisonMonth);
-  return [{
+  return {
     month,
     ...fields,
     hpiYoYPct: comparison ? rounded(100 * (fields.housePriceIndex / mean(comparison) - 1)) : null,
-  }];
+  };
 });
-if (rows.length < 410 || rows.at(-1).month !== end.slice(0, 7)) {
+if (rows.length < 410) {
   throw new Error("National macro history does not cover the intended period");
 }
 const sources = series.map((source, i) => ({
-  ...source, observations: downloads[i].observations, downloadUrl: downloads[i].downloadUrl,
+  ...source, observations: downloads[i].observations, latestCompleteMonth: downloads[i].latestCompleteMonth,
+  downloadUrl: downloads[i].downloadUrl,
 }));
 const metro = toMetroData(metroCsv);
+const lastMonth = rows.at(-1).month;
+const [year, month] = lastMonth.split("-").map(Number);
+const end = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+const readPrevious = async (name) => {
+  try {
+    return JSON.parse(await readFile(new URL(name, dataDirectory), "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+};
+const [previousMacro, previousMetro] = await Promise.all([readPrevious("macro.json"), readPrevious("metro-hpi.json")]);
+const previousQuarter = previousMetro?.latestQuarter ??
+  previousMetro?.metros.flatMap(({ index }) => Object.keys(index)).sort().at(-1);
+if (lastMonth < previousMacro?.rows.at(-1).month || metro.latestQuarter < previousQuarter) {
+  throw new Error("Source data is older than the pinned snapshot. Existing files were preserved.");
+}
 await mkdir(dataDirectory, { recursive: true });
 await Promise.all([
   writeFile(new URL("macro.json", dataDirectory), JSON.stringify({ start, end, sources, rows }) + "\n"),
   writeFile(new URL("metro-hpi.json", dataDirectory), JSON.stringify(metro) + "\n"),
 ]);
-console.log(`Joined ${rows.length} monthly observations from ${downloads.reduce((sum, item) => sum + item.observations, 0)} national observations; loaded ${metro.observations} quarterly observations across ${metro.metros.length} metro series.`);
+console.log(`Joined ${rows.length} monthly observations through ${lastMonth} from ${downloads.reduce((sum, item) => sum + item.observations, 0)} national observations. Loaded ${metro.observations} observations through ${metro.latestQuarter} across ${metro.metros.length} metro series.`);

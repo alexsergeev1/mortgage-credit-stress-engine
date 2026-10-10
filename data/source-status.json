@@ -1,33 +1,39 @@
 {
-  "checkedAt": "2026-11-11T01:18:41.532Z",
+  "checkedAt": "2026-11-11T01:29:13.625Z",
+  "snapshotMonth": "2026-08",
+  "snapshotQuarter": "2026Q2",
+  "alignedMacroLatest": "2026-08",
   "sources": [
     {
       "name": "Freddie Mac 30-year mortgage rate",
       "url": "https://fred.stlouisfed.org/series/MORTGAGE30US",
-      "snapshot": "2025-12",
+      "snapshot": "2026-08",
       "latest": "2026-11-05",
-      "status": "newer"
+      "status": "newer",
+      "latestCompleteMonth": "2026-10"
     },
     {
       "name": "BLS unemployment rate",
       "url": "https://fred.stlouisfed.org/series/UNRATE",
-      "snapshot": "2025-12",
+      "snapshot": "2026-08",
       "latest": "2026-10-01",
-      "status": "newer"
+      "status": "newer",
+      "latestCompleteMonth": "2026-10"
     },
     {
       "name": "FHFA national purchase-only HPI",
       "url": "https://fred.stlouisfed.org/series/HPIPONM226S",
-      "snapshot": "2025-12",
+      "snapshot": "2026-08",
       "latest": "2026-08-01",
-      "status": "newer"
+      "status": "current",
+      "latestCompleteMonth": "2026-08"
     },
     {
       "name": "FHFA metropolitan HPI",
       "url": "https://www.fhfa.gov/data/hpi/datasets",
-      "snapshot": "2025Q4",
+      "snapshot": "2026Q2",
       "latest": "2026Q2",
-      "status": "newer"
+      "status": "current"
     }
   ]
 }

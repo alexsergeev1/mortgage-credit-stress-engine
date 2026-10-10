@@ -202,7 +202,7 @@ function showStudy(result) {
   showTimeline();
   const d = study.diagnostics;
   $("waterfall-note").textContent = `Path ${d.waterfallScenarioId}, near the 95th percentile of aggregate pool credit loss.`;
-  $("status").textContent = `${count.format(rankedPaths.length)} holdout paths. Calibrated with ${count.format(macro.rows.length)} national months and ${count.format(d.regionalObservations)} overlapping metro-quarter changes.`;
+  $("status").textContent = `${count.format(rankedPaths.length)} holdout paths. Calibrated with ${count.format(macro.rows.length)} national months through ${macro.rows.at(-1).month} and ${count.format(d.regionalObservations)} overlapping metro-quarter changes.`;
   const coverage = d.historicalCoverage;
   const calibration = coverage ? ` Historical interval coverage on ${coverage.holdoutCount} later quarterly changes ranged from ${pct(Math.min(...coverage.variables.map((x) => x.observedCoverage)), 0)} to ${pct(Math.max(...coverage.variables.map((x) => x.observedCoverage)), 0)} for a nominal ${pct(coverage.centralInterval, 0)} interval.` : "";
   $("audit").textContent = `${count.format(d.trainingScenarios)} training paths, ${count.format(d.holdoutScenarios)} holdout paths, ${count.format(d.candidates)} allocation candidates evaluated. Waterfall reconciliation differed by at most ${money(d.maxReconciliationDollars)}. ${d.macroMethod}.${calibration}`;
@@ -236,7 +236,7 @@ function showEvidence() {
 }
 
 async function dataFile(name) {
-  const response = await fetch(new URL("./data/" + name, import.meta.url));
+  const response = await fetch(new URL("./data/" + name + "?v=4", import.meta.url));
   if (!response.ok) throw new Error("Could not load " + name + ".");
   return response.json();
 }

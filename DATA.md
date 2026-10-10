@@ -1,15 +1,15 @@
 # Data provenance
 
-Run `node ingest.mjs` from this directory to refresh the browser data. The pipeline joins monthly national data and parses the FHFA metropolitan history directly from source CSVs. No API key is required. It filters observations to January 1991 through December 2025. A fresh download can reflect source revisions, so the committed files are the reproducible snapshot for the demo.
+Run `node ingest.mjs` from this directory to refresh the browser data from January 1991 through the newest published periods. No API key is required. National data joins only closed calendar months with observations in all three series. The pipeline averages available weekly mortgage rates within each month and leaves missing months out. FHFA metro data includes published positive index values through the latest available closed quarter. A fresh download can reflect source revisions, so the committed files are the reproducible snapshot for the demo.
 
 | Artifact | Observations |
 | --- | --- |
-| `data/macro.json` | Freddie Mac 30-year rate observations averaged by calendar month, BLS monthly unemployment, and FHFA monthly seasonally adjusted purchase-only house prices. The year-over-year comparison uses the same month of the prior year. |
-| `data/metro-hpi.json` | FHFA quarterly all-transactions metro and metro division indexes, excluding unpublished values. Worst year-over-year change compares the same quarter of the prior year. |
+| `data/macro.json` | 427 aligned months through August 2026. Freddie Mac 30-year rates, BLS monthly unemployment, and FHFA seasonally adjusted purchase-only house prices. The year-over-year comparison uses the same month of the prior year. |
+| `data/metro-hpi.json` | 57,897 FHFA quarterly all-transactions observations across 410 metros and metro divisions through 2026 Q2. Worst year-over-year change compares the same quarter of the prior year. |
 | `data/cas-2025-r01.json` | Fannie Mae CAS 2025-R01 terms and disclosed pool characteristics transcribed from the executed indenture and offering memorandum. |
 
 The [national HPI](https://fred.stlouisfed.org/series/HPIPONM226S) uses purchase-only observations and seasonal adjustment. The [metro series](https://www.fhfa.gov/data/hpi/datasets) uses sale prices and appraisal data without seasonal adjustment. Compare growth rates within each series. FRED supplies current-vintage values, so a chronology check against these files is not a real-time-vintage backtest.
 
 The public deal reference records actual disclosed terms. Replicating the trust's historical payments requires the full remittance files, principal tests, loss write-ups and exact reference-tranche definitions from Fannie Mae. The model runs representative mortgage pools and never represents its payouts as observations from this deal. See [Fannie Mae Data Dynamics](https://capitalmarkets.fanniemae.com/tools-applications/data-dynamics) for the historical disclosure access workflow.
 
-Run `node check-sources.mjs` to compare the bundled snapshot with the newest national macro observations and FHFA metro quarter. The scheduled workflow publishes check metadata to `source-status`. The model still uses the pinned history until a separate ingestion run refreshes it.
+Run `node check-sources.mjs data/source-status.json` after refreshing the data to update the bundled source report. The report compares each source's newest observation with the model snapshot and separately reports the latest month common to all three national series. The scheduled workflow publishes check metadata to `source-status`. Refreshing the model inputs requires the ingestion command above.
