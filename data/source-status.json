@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-11-11T01:18:41.532Z",
+  "sources": [
+    {
+      "name": "Freddie Mac 30-year mortgage rate",
+      "url": "https://fred.stlouisfed.org/series/MORTGAGE30US",
+      "snapshot": "2025-12",
+      "latest": "2026-11-05",
+      "status": "newer"
+    },
+    {
+      "name": "BLS unemployment rate",
+      "url": "https://fred.stlouisfed.org/series/UNRATE",
+      "snapshot": "2025-12",
+      "latest": "2026-10-01",
+      "status": "newer"
+    },
+    {
+      "name": "FHFA national purchase-only HPI",
+      "url": "https://fred.stlouisfed.org/series/HPIPONM226S",
+      "snapshot": "2025-12",
+      "latest": "2026-08-01",
+      "status": "newer"
+    },
+    {
+      "name": "FHFA metropolitan HPI",
+      "url": "https://www.fhfa.gov/data/hpi/datasets",
+      "snapshot": "2025Q4",
+      "latest": "2026Q2",
+      "status": "newer"
+    }
+  ]
+}

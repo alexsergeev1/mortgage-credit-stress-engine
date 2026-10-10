@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="A mortgage credit stress simulator with constrained portfolio optimization and an auditable scenario explorer.">
   <title>Mortgage Credit Stress Engine</title>
-  <link rel="stylesheet" href="./styles.css?v=1">
+  <link rel="stylesheet" href="./styles.css?v=3">
 </head>
 <body>
   <main>
     <header class="masthead">
       <a href="./" class="brand">Mortgage Credit Stress Engine</a>
-      <nav aria-label="Sections"><a href="#decision">Decision</a><a href="#scenario">Scenarios</a><a href="#evidence">Evidence</a></nav>
+      <nav aria-label="Sections"><a href="#decision">Decision</a><a href="#scenario">Scenarios</a><a href="#risk-audit">Risk audit</a><a href="#evidence">Evidence</a></nav>
       <a class="quiet" href="https://github.com/alexsergeev1/mortgage-credit-stress-engine">Source code ↗</a>
     </header>
     <section class="intro">
@@ -60,6 +60,24 @@
         <div class="table-scroll"><table><thead><tr><th>Layer</th><th>Starting balance</th><th>Loss absorbed</th><th>Principal repaid</th><th>Remaining</th></tr></thead><tbody id="waterfall"></tbody></table></div>
       </article>
     </section>
+    <section id="risk-audit" class="lower" aria-label="Risk audit">
+      <article class="panel plot">
+        <div class="section-title">
+          <div><h2>Historical stress replay</h2><p>Hold the allocation fixed and replay observed macro paths through modeled loan and tranche rules.</p></div>
+          <button type="button" id="run-audit" disabled>Run risk audit</button>
+        </div>
+        <p class="audit-status subtle" id="audit-status" role="status">The risk audit unlocks after the first study.</p>
+        <label class="audit-select" for="replay">Observed period <select id="replay" disabled></select></label>
+        <canvas id="replay-chart" width="760" height="248" role="img" aria-label="Modeled credit loss during a selected historical macro path"></canvas>
+        <div class="legend"><span class="baseline">Equal weights</span><span class="optimized">Optimized</span><span class="third">Carry-matched</span></div>
+        <div class="path-readout" id="replay-readout"></div>
+      </article>
+      <article class="panel">
+        <div class="section-title"><div><h2>Monte Carlo stability</h2><p>Retest the same weights on five fresh random seeds. Positive differences favor the proposed allocation.</p></div></div>
+        <div class="table-scroll"><table><thead><tr><th>Seed</th><th>Paths</th><th>Tail difference</th><th>Matched difference</th><th>Carry gap</th></tr></thead><tbody id="audit-rows"></tbody></table></div>
+        <p class="audit-status subtle" id="audit-signal"></p>
+      </article>
+    </section>
     <section id="evidence" class="panel evidence">
       <div class="section-title"><div><h2>Data and validation</h2><p>Public observations and modeled assumptions are labeled at the point of use.</p></div></div>
       <div id="sources" class="evidence-grid"></div>
@@ -81,8 +99,14 @@
         </article>
       </div>
     </section>
+    <section class="panel evidence source-freshness" id="source-freshness" data-repo="alexsergeev1/mortgage-credit-stress-engine" aria-labelledby="source-title">
+      <div class="section-title"><div><h2 id="source-title">Public data updates</h2><p id="source-checked" role="status">Loading source status…</p></div><button id="source-refresh" type="button">Refresh status</button></div>
+      <ul id="source-results"></ul>
+      <a href="https://github.com/alexsergeev1/mortgage-credit-stress-engine/actions/workflows/source-status.yml">Source check runs ↗</a>
+    </section>
     <footer>Research prototype · Representative securities and scenario inputs · USD</footer>
   </main>
-  <script type="module" src="./app.mjs?v=2"></script>
+  <script type="module" src="./app.mjs?v=3"></script>
+  <script type="module" src="./source-status.mjs?v=1"></script>
 </body>
 </html>

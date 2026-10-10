@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { runStudy } from "./engine.mjs";
+import { runRiskAudit, runStudy } from "./engine.mjs";
 
 const sample = runStudy({ scenarios: 460 });
 const near = (actual, expected, tolerance = 1e-9) =>
@@ -91,4 +91,45 @@ test("fits regional housing sensitivity from aligned adjacent quarters", () => {
   assert.equal(diagnostics.regionalObservations, 31);
   near(diagnostics.regionalBetaP10, 1.25);
   near(diagnostics.regionalBetaP90, 1.25);
+});
+
+const replayMacro = Array.from({ length: 61 }, (_, i) => ({
+  month: new Date(Date.UTC(2006, 11 + i)).toISOString().slice(0, 7),
+  mortgageRatePct: 6 + i * 0.02,
+  unemploymentPct: 5 + i * 0.03,
+  housePriceIndex: 120 - i * 0.3,
+}));
+const replayInputs = { scenarios: 100, auditScenarios: 200, macroHistory: replayMacro };
+const fitted = runStudy(replayInputs);
+
+test("historical replay follows the observed path and rejects gaps instead of filling them", () => {
+  const { historical } = runRiskAudit(replayInputs, fitted);
+  const [bust, recovery] = historical;
+  assert.equal(bust.status, "replayed");
+  assert.equal(bust.quarters, 20);
+  assert.equal(bust.timeline[0].month, "2007-03");
+  assert.equal(bust.timeline.at(-1).month, "2011-12");
+  near(bust.timeline[0].mortgageRatePct, 6.04);
+  near(bust.housePriceChange, 102 / 120 - 1);
+  near(bust.unemploymentPeak, 6.8);
+  assert.ok(bust.timeline.every((point, i, points) => !i || point.optimizedLoss >= points[i - 1].optimizedLoss));
+  assert.ok(bust.maxReconciliationDollars < 0.01);
+  assert.equal(recovery.status, "missing-months");
+  const incomplete = runRiskAudit({ ...replayInputs, macroHistory: replayMacro.filter((_, i) => i !== 16) }, fitted);
+  assert.equal(incomplete.historical[0].status, "missing-months");
+});
+
+test("multi-seed audit keeps fitted allocations fixed and reuses paired scenario draws", () => {
+  const first = runRiskAudit(replayInputs, fitted);
+  assert.deepEqual(runRiskAudit(replayInputs, fitted), first);
+  assert.equal(first.robustness.runs.length, 5);
+  assert.equal(first.robustness.totalScenarios, 1000);
+  assert.equal(new Set(first.robustness.runs.map((run) => run.seed)).size, 5);
+  for (const run of first.robustness.runs) {
+    assert.notEqual(run.seed, fitted.config.seed);
+    assert.deepEqual(run.optimized.weights, fitted.optimized.weights);
+    assert.deepEqual(run.carryMatched.weights, fitted.carryMatched.weights);
+    near(run.cvarDelta, run.baseline.cvar - run.optimized.cvar);
+    near(run.matchedCvarDeltaDollars, run.baseline.cvarDollars - run.carryMatched.cvarDollars);
+  }
 });

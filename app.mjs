@@ -4,7 +4,8 @@ const count = new Intl.NumberFormat("en-US");
 const pct = (value, decimals = 2) => Number.isFinite(value) ? (100 * value).toFixed(decimals) + "%" : "—";
 const money = (value) => Number.isFinite(value) ? usd.format(value) : "—";
 const colors = { base: "#f5bd8c", selected: "#a9e8ce", third: "#a5baf8", grid: "#30434e", text: "#a8bac2" };
-let study, rankedPaths = [], macro, worker, metros;
+let study, rankedPaths = [], macro, worker, metros, riskAudit;
+let workerBusy = false;
 
 function cell(text, className) {
   const td = document.createElement("td");
@@ -112,6 +113,64 @@ function showTimeline() {
   ], ["Quarter 1", "Quarter " + study.timeline.at(-1).quarter]);
 }
 
+function clearAudit() {
+  riskAudit = undefined;
+  $("audit-rows").replaceChildren();
+  $("replay").replaceChildren();
+  $("replay").disabled = true;
+  $("replay-readout").replaceChildren();
+  $("audit-signal").textContent = "";
+  const canvas = $("replay-chart");
+  canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  $("audit-status").textContent = "Run the audit on the current allocation.";
+}
+
+function showReplay() {
+  const replay = riskAudit?.historical.find(({ id }) => id === $("replay").value);
+  if (!replay) return;
+  if (replay.status !== "replayed") {
+    $("replay-readout").textContent = "The pinned macro snapshot is missing months for this window.";
+    const canvas = $("replay-chart");
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  const points = replay.timeline;
+  seriesChart($("replay-chart"), [
+    { color: colors.base, values: points.map((point) => point.baselineLoss) },
+    { color: colors.selected, values: points.map((point) => point.optimizedLoss) },
+    { color: colors.third, values: points.map((point) => point.carryMatchedLoss) },
+  ], [points[0].month, points.at(-1).month]);
+  $("replay-readout").replaceChildren(...[
+    ["Equal-weight credit loss", money(replay.baselineLoss * study.config.portfolioSize)],
+    ["Optimized credit loss", money(replay.optimizedLoss * study.config.portfolioSize)],
+    ["Carry-matched credit loss", money(replay.carryMatchedLoss * study.config.portfolioSize)],
+    ["Observed peak unemployment", pct(replay.unemploymentPeak / 100)],
+    ["Observed house-price change", pct(replay.housePriceChange)],
+    ["Mortgage rate at end", pct(replay.mortgageRateEnd / 100)],
+  ].map(([label, value]) => {
+    const div = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    div.append(label, strong);
+    return div;
+  }));
+}
+
+function showRiskAudit(audit) {
+  riskAudit = audit;
+  $("replay").replaceChildren(...audit.historical.map(({ id, label, start, end }) =>
+    new Option(`${label} · ${start}–${end}`, id)));
+  $("replay").disabled = false;
+  const result = audit.robustness;
+  $("audit-rows").replaceChildren(...result.runs.map((run) => row([
+    count.format(run.seed), count.format(run.scenarios), money(run.cvarDeltaDollars),
+    money(run.matchedCvarDeltaDollars), run.matchedCarryGapBps.toFixed(2) + " bp",
+  ])));
+  $("audit-signal").textContent = `Carry-matched tail loss improved on ${result.matchedWins} of ${result.runs.length} seeds. Median difference ${money(result.medianMatchedDeltaDollars)}. The selected carry floor held on ${result.optimizedFeasibleRuns} runs.`;
+  $("audit-status").textContent = `${audit.historical.filter(({ status }) => status === "replayed").length} observed windows replayed and ${count.format(result.totalScenarios)} fresh simulated paths evaluated.`;
+  showReplay();
+}
+
 function showStudy(result) {
   study = result;
   const { baseline, optimized, config, assets } = study;
@@ -201,10 +260,13 @@ function loadEvidence() {
 }
 
 function run() {
-  if (!macro || !$("study").reportValidity()) return;
+  if (!macro || workerBusy || !$("study").reportValidity()) return;
+  workerBusy = true;
   $("run").disabled = true;
+  $("run-audit").disabled = true;
+  $("export").disabled = true;
   $("status").textContent = "Simulating and optimizing…";
-  worker.postMessage({
+  worker.postMessage({ kind: "study", inputs: {
     stress: Number($("stress").value),
     portfolioSize: Number($("size").value) * 1e6,
     carryFloor: Number($("carry").value) / 100,
@@ -212,16 +274,32 @@ function run() {
     scenarios: Number($("paths").value),
     macroHistory: macro.rows,
     metroHistory: metros.metros,
+  } });
+}
+
+function runAudit() {
+  if (!study || workerBusy) return;
+  workerBusy = true;
+  $("run").disabled = true;
+  $("run-audit").disabled = true;
+  $("audit-status").textContent = "Replaying macro history and resampling the allocation…";
+  const { config, baseline, optimized, carryMatched, diagnostics } = study;
+  worker.postMessage({
+    kind: "audit",
+    inputs: { macroHistory: macro.rows, metroHistory: metros.metros },
+    study: { config, baseline, optimized, carryMatched, diagnostics },
   });
 }
 
 $("study").addEventListener("submit", (event) => { event.preventDefault(); run(); });
+$("run-audit").addEventListener("click", runAudit);
+$("replay").addEventListener("change", showReplay);
 $("stress").addEventListener("input", () => { $("stress-value").textContent = Number($("stress").value).toFixed(1) + "×"; });
 $("path").addEventListener("input", showPath);
 $("metro").addEventListener("change", showMetro);
-window.addEventListener("resize", () => { showPath(); showTimeline(); });
+window.addEventListener("resize", () => { showPath(); showTimeline(); showReplay(); });
 $("export").addEventListener("click", () => {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ provenance: macro.sources, study }, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ provenance: macro.sources, study, riskAudit }, null, 2)], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = "mortgage-credit-study.json";
@@ -230,17 +308,27 @@ $("export").addEventListener("click", () => {
 });
 
 try {
-  worker = new Worker(new URL("./worker.mjs", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.mjs?v=3", import.meta.url), { type: "module" });
   worker.addEventListener("message", ({ data }) => {
+    workerBusy = false;
     $("run").disabled = false;
+    $("run-audit").disabled = !study;
+    $("export").disabled = !study;
     if (data.error) {
-      $("status").textContent = data.error;
+      $(data.kind === "audit" ? "audit-status" : "status").textContent = data.error;
       return;
     }
-    showStudy(data.study);
+    if (data.kind === "audit") showRiskAudit(data.audit);
+    else {
+      showStudy(data.study);
+      clearAudit();
+      $("run-audit").disabled = false;
+    }
   });
   worker.addEventListener("error", () => {
-    $("run").disabled = false;
+    workerBusy = false;
+    $("run").disabled = true;
+    $("run-audit").disabled = true;
     $("status").textContent = "The simulation worker could not start. Reload the page to retry.";
   });
   [macro, metros] = await Promise.all([dataFile("macro.json"), dataFile("metro-hpi.json")]);

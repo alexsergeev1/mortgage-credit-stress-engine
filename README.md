@@ -14,6 +14,10 @@ node study.mjs 6000 1.4 > audit.json
 
 The local dashboard opens at [127.0.0.1:4176](http://127.0.0.1:4176). Use the scenario explorer to inspect a tail outcome. The export records the assumptions, weights, simulated paths and audit diagnostics.
 
+**Run risk audit** replays four observed national macro periods through the representative tranche rules. It also tests the current weights on 4,000 fresh simulated paths across five predetermined seeds. Historical replays illustrate sensitivity to observed conditions. The loan behavior and tranche losses remain modeled, and the audit reports carry-matched differences even when they are negative.
+
+**Public data updates** shows the latest source check and flags newer releases. GitHub Actions checks FRED and FHFA daily. Studies use the documented macro and metro snapshots for reproducibility.
+
 ## What the data establishes
 
 - **Historical observations.** 419 monthly observations align mortgage rates, unemployment and house prices. Quarterly joint changes inform the simulated macro shocks. The metro explorer includes 57,077 FHFA observations across 410 metros and metro divisions. Overlapping national and metro changes estimate the range of regional sensitivities used in the simulation.

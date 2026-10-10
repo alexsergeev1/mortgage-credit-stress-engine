@@ -1,6 +1,13 @@
 const QUARTERS = 20;
 const BASELINE_SEED = 51026;
 const EPSILON = 1e-10;
+const REPLAY_WINDOWS = [
+  { id: "housing-crisis", label: "Housing bust and financial crisis", start: "2006-12", end: "2011-12" },
+  { id: "recovery", label: "Housing recovery and expansion", start: "2012-12", end: "2017-12" },
+  { id: "pandemic", label: "Pandemic shock and reopening", start: "2019-12", end: "2024-12" },
+  { id: "rate-reset", label: "Mortgage rate reset", start: "2021-12", end: "2025-09" },
+];
+const AUDIT_SEEDS = [104729, 224737, 350377, 479909, 611953];
 
 const deals = [
   {
@@ -133,6 +140,7 @@ function calibrateMacro(history) {
     innovations: vectors.map((vector) => vector.map((value, i) => value - means[i])),
     historicalCoverage: historyCoverage(vectors),
     nationalQuarters,
+    monthly: byMonth,
   };
 }
 
@@ -231,7 +239,7 @@ function distribute(notes, losses, principal) {
   return Math.abs(losses) + Math.abs(principal);
 }
 
-function projectDeal(deal, path, localRisk) {
+function projectDeal(deal, path, localRisk, recordNoteLosses = false) {
   const cohorts = deal.collateral.map(([share, ltv, hazard]) =>
     ({ balance: deal.principal * share, ltv, hazard }));
   const notes = notesForDeal(deal);
@@ -271,7 +279,9 @@ function projectDeal(deal, path, localRisk) {
     }
     poolLoss += losses;
     poolPrincipal += principal;
-    timeline.push({ poolLoss, poolDefault, poolPrepay });
+    const point = { poolLoss, poolDefault, poolPrepay };
+    if (recordNoteLosses) point.noteLosses = notes.slice(1, -1).map((note) => note.loss / note.initialPrincipal);
+    timeline.push(point);
   }
   const outstanding = cohorts.reduce((sum, cohort) => sum + cohort.balance, 0);
   const lossMismatch = Math.abs(poolLoss - notes.reduce((sum, note) => sum + note.loss, 0));
@@ -512,6 +522,129 @@ export function runStudy(options = {}) {
       waterfallPoolLoss: example.poolLoss,
       maxReconciliationDollars: all.reduce((maximum, scenario) => Math.max(maximum, scenario.reconciliation), 0),
       cvarSavings: baseline.cvarDollars - optimized.cvarDollars,
+    },
+  };
+}
+
+function replayWindow(window, monthly, portfolios) {
+  const start = monthNumber(window.start), end = monthNumber(window.end);
+  const base = monthly.get(start);
+  const months = Array.from({ length: end - start }, (_, i) => monthly.get(start + i + 1));
+  if (!base || months.some((row) => !row)) return { ...window, status: "missing-months" };
+
+  const path = [];
+  for (let i = 0; i < months.length; i += 3) {
+    const [first, second, third] = months.slice(i, i + 3);
+    const unemployment = (first.unemploymentPct + second.unemploymentPct + third.unemploymentPct) / 3;
+    const mortgageRate = (first.mortgageRatePct + second.mortgageRatePct + third.mortgageRatePct) / 300;
+    path.push({
+      month: third.month, unemployment, mortgageRate,
+      houseIndex: third.housePriceIndex / base.housePriceIndex,
+      unemploymentBase: base.unemploymentPct,
+    });
+  }
+
+  const pools = deals.map((deal) => projectDeal(deal, path, 1, true));
+  const timeline = path.map((point, i) => {
+    const losses = pools.flatMap((pool) => pool.timeline[i].noteLosses);
+    return {
+      month: point.month,
+      quarter: i + 1,
+      housePriceChange: point.houseIndex - 1,
+      unemploymentPct: point.unemployment,
+      mortgageRatePct: point.mortgageRate * 100,
+      baselineLoss: weightedSum(losses, portfolios.baseline),
+      optimizedLoss: weightedSum(losses, portfolios.optimized),
+      carryMatchedLoss: weightedSum(losses, portfolios.carryMatched),
+      poolLoss: pools.reduce((sum, pool) => sum + pool.timeline[i].poolLoss, 0) / totalPool,
+    };
+  });
+  const carries = pools.flatMap((pool) => pool.notes.slice(1, -1)
+    .map((note) => note.income / note.initialPrincipal / (path.length / 4)));
+  const last = timeline.at(-1);
+  return {
+    ...window,
+    status: "replayed",
+    quarters: path.length,
+    baselineLoss: last.baselineLoss,
+    optimizedLoss: last.optimizedLoss,
+    carryMatchedLoss: last.carryMatchedLoss,
+    baselineCarry: weightedSum(carries, portfolios.baseline),
+    optimizedCarry: weightedSum(carries, portfolios.optimized),
+    carryMatchedCarry: weightedSum(carries, portfolios.carryMatched),
+    poolLoss: last.poolLoss,
+    housePriceChange: last.housePriceChange,
+    unemploymentPeak: Math.max(base.unemploymentPct, ...months.map((row) => row.unemploymentPct)),
+    mortgageRateEnd: months.at(-1).mortgageRatePct,
+    timeline,
+    maxReconciliationDollars: Math.max(...pools.map((pool) => pool.reconciliation)),
+  };
+}
+
+function fixedPortfolios(study) {
+  return Object.fromEntries(["baseline", "optimized", "carryMatched"].map((name) => {
+    const weights = study[name]?.weights;
+    if (!Array.isArray(weights) || weights.length !== assetCount ||
+      weights.some((value) => !Number.isFinite(value) || value < -EPSILON) ||
+      Math.abs(weights.reduce((sum, value) => sum + value, 0) - 1) > EPSILON) {
+      throw new RangeError(`A fully invested ${name} allocation is required for the audit.`);
+    }
+    return [name, [...weights]];
+  }));
+}
+
+export function runRiskAudit(options = {}, study = null) {
+  const fitted = study ?? runStudy(options);
+  const config = parameters({ ...options, ...fitted.config });
+  const portfolios = fixedPortfolios(fitted);
+  const macro = calibrateMacro(options.macroHistory);
+  const regional = calibrateRegional(options.metroHistory, macro.nationalQuarters);
+  const historical = REPLAY_WINDOWS.map((window) => replayWindow(window, macro.monthly, portfolios));
+  const scenarioCount = Math.round(bounded(options.auditScenarios, 800, 200, 3000));
+  const matchedFloor = fitted.diagnostics?.carryMatchedTrainingFloor ?? config.carryFloor;
+  const matchedConfig = { ...config, carryFloor: matchedFloor };
+
+  const runs = AUDIT_SEEDS.map((offset) => {
+    const seed = (config.seed + offset) >>> 0;
+    const random = randomSource(seed);
+    const paths = Array.from({ length: scenarioCount }, (_, i) =>
+      generateScenario(random, macro, regional, config.stress, i, false));
+    const carries = meansFor(paths, "carries");
+    const baseline = measure(paths, portfolios.baseline, carries, config);
+    const optimized = measure(paths, portfolios.optimized, carries, config);
+    const carryMatched = measure(paths, portfolios.carryMatched, carries, matchedConfig);
+    return {
+      seed, scenarios: paths.length, baseline, optimized, carryMatched,
+      cvarDelta: baseline.cvar - optimized.cvar,
+      cvarDeltaDollars: baseline.cvarDollars - optimized.cvarDollars,
+      matchedCvarDelta: baseline.cvar - carryMatched.cvar,
+      matchedCvarDeltaDollars: baseline.cvarDollars - carryMatched.cvarDollars,
+      matchedCarryGapBps: (carryMatched.expectedCarry - baseline.expectedCarry) * 10_000,
+    };
+  });
+  const deltas = runs.map((run) => run.cvarDeltaDollars).sort((a, b) => a - b);
+  const matchedDeltas = runs.map((run) => run.matchedCvarDeltaDollars).sort((a, b) => a - b);
+  return {
+    config,
+    historical,
+    robustness: {
+      runs, scenarioCount,
+      totalScenarios: runs.length * scenarioCount,
+      optimizedWins: runs.filter((run) => run.cvarDelta > EPSILON).length,
+      matchedWins: runs.filter((run) => run.matchedCvarDelta > EPSILON).length,
+      optimizedFeasibleRuns: runs.filter((run) => run.optimized.feasible).length,
+      matchedFeasibleRuns: runs.filter((run) => run.carryMatched.feasible).length,
+      deltaRangeDollars: [deltas[0], deltas.at(-1)],
+      matchedDeltaRangeDollars: [matchedDeltas[0], matchedDeltas.at(-1)],
+      medianDeltaDollars: percentile(deltas, 0.5),
+      medianMatchedDeltaDollars: percentile(matchedDeltas, 0.5),
+    },
+    diagnostics: {
+      historicalMethod: "Observed quarterly average mortgage rates and unemployment with quarter-end national house prices",
+      historicalScope: "Representative pools are exposed to the observed national path with no modeled regime overlay or refit",
+      robustnessMethod: "Five predetermined seeds resample the same model inputs with all fitted portfolio weights held fixed",
+      carryMatchedTrainingFloor: matchedFloor,
+      studyStatus: fitted.diagnostics?.status ?? null,
     },
   };
 }
