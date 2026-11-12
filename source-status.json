@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-11T19:34:13.025Z",
+  "checkedAt": "2026-11-12T19:52:30.399Z",
   "snapshotMonth": "2026-08",
   "snapshotQuarter": "2026Q2",
   "alignedMacroLatest": "2026-08",
@@ -8,7 +8,7 @@
       "name": "Freddie Mac 30-year mortgage rate",
       "url": "https://fred.stlouisfed.org/series/MORTGAGE30US",
       "snapshot": "2026-08",
-      "latest": "2026-11-05",
+      "latest": "2026-11-12",
       "status": "newer",
       "latestCompleteMonth": "2026-10"
     },
