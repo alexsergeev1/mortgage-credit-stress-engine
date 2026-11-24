@@ -1,8 +1,8 @@
 {
-  "checkedAt": "2026-11-23T23:50:25.147Z",
+  "checkedAt": "2026-11-24T22:23:29.572Z",
   "snapshotMonth": "2026-08",
   "snapshotQuarter": "2026Q2",
-  "alignedMacroLatest": "2026-08",
+  "alignedMacroLatest": "2026-09",
   "sources": [
     {
       "name": "Freddie Mac 30-year mortgage rate",
@@ -24,16 +24,16 @@
       "name": "FHFA national purchase-only HPI",
       "url": "https://fred.stlouisfed.org/series/HPIPONM226S",
       "snapshot": "2026-08",
-      "latest": "2026-08-01",
-      "status": "current",
-      "latestCompleteMonth": "2026-08"
+      "latest": "2026-09-01",
+      "status": "newer",
+      "latestCompleteMonth": "2026-09"
     },
     {
       "name": "FHFA metropolitan HPI",
       "url": "https://www.fhfa.gov/data/hpi/datasets",
       "snapshot": "2026Q2",
-      "latest": "2026Q2",
-      "status": "current"
+      "latest": "2026Q3",
+      "status": "newer"
     }
   ]
 }
